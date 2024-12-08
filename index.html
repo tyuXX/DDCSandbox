@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DDCSandbox - Falling Sand Simulator</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div class="game-container">
@@ -19,7 +19,10 @@
             <div class="tps-control">
                 <label for="target-tps">Target TPS: <span id="tps-value">60</span></label>
                 <input type="range" id="target-tps" min="1" max="120" value="60">
-                <div class="tps-counter">Current: <span id="current-tps">0</span>/<span id="set-tps">60</span> TPS</div>
+                <div class="performance-stats">
+                    <div class="tps-counter">TPS: <span id="current-tps">0</span>/<span id="set-tps">60</span></div>
+                    <div class="fps-counter">FPS: <span id="current-fps">0</span></div>
+                </div>
             </div>
             <div class="grid-control">
                 <div class="grid-size">
@@ -38,6 +41,7 @@
         </div>
         
     </div>
-    <script src="game.js"></script>
+    <script src="js/particles.js" defer></script>
+    <script src="js/game.js"></script>
 </body>
 </html>

@@ -27,7 +27,7 @@ class SandboxGame {
         this.lastFPSUpdate = performance.now();
         
         // Initialize physics worker
-        this.physicsWorker = new Worker('physics-worker.js');
+        this.physicsWorker = new Worker('/js/physics-worker.js');
         this.physicsWorker.onmessage = this.handleWorkerMessage.bind(this);
         
         this.setupCanvas();
