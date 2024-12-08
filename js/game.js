@@ -65,6 +65,14 @@ class SandboxGame {
     }
 
     setupGrid() {
+        // Ensure grid dimensions are reasonable
+        const maxGridSize = 10000; // Prevent extremely large grids
+        const clampedCols = Math.min(this.cols, maxGridSize);
+        const clampedRows = Math.min(this.rows, maxGridSize);
+
+        this.cols = clampedCols;
+        this.rows = clampedRows;
+
         this.grid = Array(this.rows).fill().map(() => 
             Array(this.cols).fill().map(() => ({ type: 'empty', color: PARTICLE_PROPERTIES.empty.color }))
         );
@@ -217,6 +225,13 @@ class SandboxGame {
     }
 
     applyGridResize() {
+        const maxGridSize = 10000; // Prevent extremely large grids
+        const clampedWidth = Math.min(this.pendingWidth, maxGridSize * this.pendingCellSize);
+        const clampedHeight = Math.min(this.pendingHeight, maxGridSize * this.pendingCellSize);
+
+        this.pendingWidth = clampedWidth;
+        this.pendingHeight = clampedHeight;
+
         const oldGrid = this.grid;
         const oldCols = this.cols;
         const oldRows = this.rows;
@@ -268,11 +283,30 @@ class SandboxGame {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
-        for (let y = 0; y < this.rows; y++) {
-            for (let x = 0; x < this.cols; x++) {
+        // Safety check to prevent rendering if grid is invalid
+        if (!this.grid || !Array.isArray(this.grid)) {
+            console.warn('Invalid grid, skipping render');
+            return;
+        }
+        
+        for (let y = 0; y < Math.min(this.rows, this.grid.length); y++) {
+            // Additional safety check for each row
+            if (!this.grid[y] || !Array.isArray(this.grid[y])) {
+                console.warn(`Invalid row at index ${y}, skipping`);
+                continue;
+            }
+            
+            for (let x = 0; x < Math.min(this.cols, this.grid[y].length); x++) {
                 const particle = this.grid[y][x];
+                
+                // Safety check for each particle
+                if (!particle || typeof particle !== 'object') {
+                    console.warn(`Invalid particle at (${x}, ${y}), skipping`);
+                    continue;
+                }
+                
                 if (particle.type !== 'empty') {
-                    this.ctx.fillStyle = particle.color;
+                    this.ctx.fillStyle = particle.color || '#000000';
                     this.ctx.fillRect(
                         x * this.cellSize,
                         y * this.cellSize,
