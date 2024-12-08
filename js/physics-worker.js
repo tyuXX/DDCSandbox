@@ -73,28 +73,64 @@ function updatePhysics() {
     // Create a copy of the grid for reading while we modify the original
     const oldGrid = grid.map(row => [...row]);
     
+    // Process particles from bottom to top to prevent multiple updates
     for (let y = rows - 1; y >= 0; y--) {
+        // Randomize horizontal direction to prevent bias
+        const horizontalDirections = Math.random() < 0.5 ? [1, -1] : [-1, 1];
+        
         for (let x = 0; x < cols; x++) {
             const particle = oldGrid[y][x];
             
+            // Skip empty or immovable particles
             if (particle.type === 'empty' || !particleProperties[particle.type].movable) continue;
 
+            // Gravity-based particles (sand, water, etc.)
             if (particleProperties[particle.type].gravity) {
-                // Check below
+                // Attempt to move directly down
                 if (y < rows - 1 && grid[y + 1][x].type === 'empty') {
                     grid[y + 1][x] = particle;
                     grid[y][x] = { type: 'empty', color: particleProperties.empty.color };
                     continue;
                 }
 
-                // If it's a liquid, try to move diagonally or sideways
+                // Liquid behavior
                 if (particleProperties[particle.type].liquid) {
-                    const directions = [[-1, 0], [1, 0]];
-                    for (const [dx, dy] of directions) {
+                    // Try to spread out horizontally to level the surface
+                    const levelingDirections = [
+                        [horizontalDirections[0], 0],  // primary horizontal direction
+                        [horizontalDirections[1], 0],  // opposite horizontal direction
+                        [horizontalDirections[0], 1],  // diagonal down
+                        [horizontalDirections[1], 1]   // opposite diagonal down
+                    ];
+                    
+                    for (const [dx, dy] of levelingDirections) {
                         const newX = x + dx;
+                        const newY = y + dy;
+                        
                         if (newX >= 0 && newX < cols && 
-                            grid[y][newX].type === 'empty') {
-                            grid[y][newX] = particle;
+                            newY < rows && 
+                            grid[newY][newX].type === 'empty') {
+                            grid[newY][newX] = particle;
+                            grid[y][x] = { type: 'empty', color: particleProperties.empty.color };
+                            break;
+                        }
+                    }
+                }
+                // Sand-like behavior for non-liquid gravity particles
+                else {
+                    const sandDirections = [
+                        [horizontalDirections[0], 1],  // primary diagonal down
+                        [horizontalDirections[1], 1]   // opposite diagonal down
+                    ];
+                    
+                    for (const [dx, dy] of sandDirections) {
+                        const newX = x + dx;
+                        const newY = y + dy;
+                        
+                        if (newX >= 0 && newX < cols && 
+                            newY < rows && 
+                            grid[newY][newX].type === 'empty') {
+                            grid[newY][newX] = particle;
                             grid[y][x] = { type: 'empty', color: particleProperties.empty.color };
                             break;
                         }
@@ -102,32 +138,44 @@ function updatePhysics() {
                 }
             }
             
-            // Gas behavior (floats upwards and spreads)
+            // Gas behavior
             if (particleProperties[particle.type].gas) {
-                // Try to move up
-                if (y > 0 && grid[y - 1][x].type === 'empty') {
-                    grid[y - 1][x] = particle;
-                    grid[y][x] = { type: 'empty', color: particleProperties.empty.color };
-                    continue;
-                }
+                // Try to spread out and move upwards
+                const gasDirections = [
+                    [0, -1],    // directly up
+                    [-1, -1],   // up-left
+                    [1, -1],    // up-right
+                    [-1, 0],    // left
+                    [1, 0],     // right
+                    [-1, -2],   // further up-left
+                    [1, -2]     // further up-right
+                ];
                 
-                // If can't go up, try to spread sideways
-                const directions = [[-1, 0], [1, 0]];
-                for (const [dx, dy] of directions) {
+                for (const [dx, dy] of gasDirections) {
                     const newX = x + dx;
+                    const newY = y + dy;
+                    
                     if (newX >= 0 && newX < cols && 
-                        grid[y][newX].type === 'empty') {
-                        grid[y][newX] = particle;
-                        grid[y][x] = { type: 'empty', color: particleProperties.empty.color };
-                        break;
+                        newY >= 0 && newY < rows && 
+                        grid[newY][newX].type === 'empty') {
+                        
+                        // Check surrounding cells to simulate leveling
+                        const surroundingEmptySpaces = [
+                            [newX-1, newY],
+                            [newX+1, newY]
+                        ].filter(([sx, sy]) => 
+                            sx >= 0 && sx < cols && 
+                            sy >= 0 && sy < rows && 
+                            grid[sy][sx].type === 'empty'
+                        );
+                        
+                        // Move if there are empty spaces around to spread out
+                        if (surroundingEmptySpaces.length > 0) {
+                            grid[newY][newX] = particle;
+                            grid[y][x] = { type: 'empty', color: particleProperties.empty.color };
+                            break;
+                        }
                     }
-                }
-            }
-
-            // Handle TNT explosions
-            if (particle.type === 'tnt') {
-                if (Math.random() < 0.001) {
-                    createExplosion(x, y);
                 }
             }
         }
@@ -136,27 +184,29 @@ function updatePhysics() {
 
 function createExplosion(x, y) {
     const explosionRadius = 10;
+    const gasDensity = 0.7; // Probability of creating gas
     
     for (let dy = -explosionRadius; dy <= explosionRadius; dy++) {
         for (let dx = -explosionRadius; dx <= explosionRadius; dx++) {
+            const distance = Math.sqrt(dx * dx + dy * dy);
             const newX = x + dx;
             const newY = y + dy;
             
-            // Check if within grid and within explosion radius
+            // Check if within grid and explosion radius
             if (newX >= 0 && newX < cols && 
                 newY >= 0 && newY < rows && 
-                Math.sqrt(dx*dx + dy*dy) <= explosionRadius) {
+                distance <= explosionRadius) {
                 
-                // Randomly create CO2 gas around the explosion
-                if (Math.random() < 0.5) {
+                // Randomize explosion effects
+                if (Math.random() < 0.8) {
+                    grid[newY][newX] = { type: 'empty', color: particleProperties.empty.color };
+                }
+                
+                // Create CO2 gas with variable density
+                if (Math.random() < gasDensity) {
                     grid[newY][newX] = { 
                         type: 'co2', 
                         color: particleProperties.co2.color 
-                    };
-                } else {
-                    grid[newY][newX] = { 
-                        type: 'empty', 
-                        color: particleProperties.empty.color 
                     };
                 }
             }
