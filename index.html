@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDCSandbox - Falling Sand Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="toolbar">
+            <div class="element-selector">
+            </div>
+            <div class="size-control">
+                <label for="cursor-size">Size: <span id="size-value">1</span></label>
+                <input type="range" id="cursor-size" min="1" max="10" value="1">
+            </div>
+            <div class="tps-control">
+                <label for="target-tps">Target TPS: <span id="tps-value">60</span></label>
+                <input type="range" id="target-tps" min="1" max="120" value="60">
+                <div class="tps-counter">Current: <span id="current-tps">0</span>/<span id="set-tps">60</span> TPS</div>
+            </div>
+            <div class="grid-control">
+                <div class="grid-size">
+                    <label for="cell-size">Cell Size: <span id="cell-size-value">4</span>px</label>
+                    <input type="range" id="cell-size" min="1" max="10" value="4">
+                </div>
+                <div class="canvas-size">
+                    <label for="canvas-width">Width: <span id="width-value">800</span>px</label>
+                    <input type="range" id="canvas-width" min="400" max="2000" step="100" value="800">
+                    <label for="canvas-height">Height: <span id="height-value">600</span>px</label>
+                    <input type="range" id="canvas-height" min="300" max="1500" step="100" value="600">
+                </div>
+                <button id="apply-size">Apply Size</button>
+            </div>
+            <button id="clear-btn">Clear</button>
+        </div>
+        
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
