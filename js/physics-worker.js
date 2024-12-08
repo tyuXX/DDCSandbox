@@ -99,18 +99,27 @@ function updatePhysics() {
                             break;
                         }
                     }
-                } else {
-                    // For sand-like particles, try to move diagonally down
-                    const directions = [[-1, 1], [1, 1]];
-                    for (const [dx, dy] of directions) {
-                        const newX = x + dx;
-                        const newY = y + dy;
-                        if (newX >= 0 && newX < cols && newY < rows && 
-                            grid[newY][newX].type === 'empty') {
-                            grid[newY][newX] = particle;
-                            grid[y][x] = { type: 'empty', color: particleProperties.empty.color };
-                            break;
-                        }
+                }
+            }
+            
+            // Gas behavior (floats upwards and spreads)
+            if (particleProperties[particle.type].gas) {
+                // Try to move up
+                if (y > 0 && grid[y - 1][x].type === 'empty') {
+                    grid[y - 1][x] = particle;
+                    grid[y][x] = { type: 'empty', color: particleProperties.empty.color };
+                    continue;
+                }
+                
+                // If can't go up, try to spread sideways
+                const directions = [[-1, 0], [1, 0]];
+                for (const [dx, dy] of directions) {
+                    const newX = x + dx;
+                    if (newX >= 0 && newX < cols && 
+                        grid[y][newX].type === 'empty') {
+                        grid[y][newX] = particle;
+                        grid[y][x] = { type: 'empty', color: particleProperties.empty.color };
+                        break;
                     }
                 }
             }
@@ -126,15 +135,29 @@ function updatePhysics() {
 }
 
 function createExplosion(x, y) {
-    const radius = 10;
-    for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance <= radius) {
-                const newX = x + dx;
-                const newY = y + dy;
-                if (newX >= 0 && newX < cols && newY >= 0 && newY < rows) {
-                    grid[newY][newX] = { type: 'empty', color: particleProperties.empty.color };
+    const explosionRadius = 10;
+    
+    for (let dy = -explosionRadius; dy <= explosionRadius; dy++) {
+        for (let dx = -explosionRadius; dx <= explosionRadius; dx++) {
+            const newX = x + dx;
+            const newY = y + dy;
+            
+            // Check if within grid and within explosion radius
+            if (newX >= 0 && newX < cols && 
+                newY >= 0 && newY < rows && 
+                Math.sqrt(dx*dx + dy*dy) <= explosionRadius) {
+                
+                // Randomly create CO2 gas around the explosion
+                if (Math.random() < 0.5) {
+                    grid[newY][newX] = { 
+                        type: 'co2', 
+                        color: particleProperties.co2.color 
+                    };
+                } else {
+                    grid[newY][newX] = { 
+                        type: 'empty', 
+                        color: particleProperties.empty.color 
+                    };
                 }
             }
         }

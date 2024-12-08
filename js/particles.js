@@ -25,6 +25,13 @@ const PARTICLE_PROPERTIES = {
         explosive: true,
         name: 'TNT'
     },
+    co2: {
+        color: '#a0a0a0',
+        gravity: false,
+        movable: true,
+        gas: true,
+        name: 'Carbon Dioxide'
+    },
     empty: {
         color: '#000000',
         name: 'Empty'
