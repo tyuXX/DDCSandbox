@@ -38,6 +38,15 @@ self.onmessage = function(e) {
             targetTPS = data.tps;
             restartPhysicsLoop();
             break;
+
+        case 'updateRequest':
+            const particleUpdatesLastFrame = updatePhysics();
+            self.postMessage({ 
+                type: 'gridUpdate', 
+                grid: grid,
+                particleUpdatesLastFrame: particleUpdatesLastFrame
+            });
+            break;
     }
 };
 
@@ -50,7 +59,7 @@ function startPhysicsLoop() {
     updateInterval = setInterval(() => {
         const now = performance.now();
         
-        updatePhysics();
+        const particleUpdatesLastFrame = updatePhysics();
         
         // TPS counting
         tickCount++;
@@ -61,7 +70,11 @@ function startPhysicsLoop() {
             lastTPSUpdate = now;
         }
         
-        self.postMessage({ type: 'gridUpdate', grid: grid });
+        self.postMessage({ 
+            type: 'gridUpdate', 
+            grid: grid,
+            particleUpdatesLastFrame: particleUpdatesLastFrame
+        });
     }, msPerTick);
 }
 
@@ -70,19 +83,28 @@ function restartPhysicsLoop() {
 }
 
 function updatePhysics() {
+    // Performance tracking
+    let particleUpdatesLastFrame = 0;
+
     // Create a copy of the grid for reading while we modify the original
     const oldGrid = grid.map(row => [...row]);
     
     // Process particles from bottom to top to prevent multiple updates
     for (let y = rows - 1; y >= 0; y--) {
-        // Randomize horizontal direction to prevent bias
-        const horizontalDirections = Math.random() < 0.5 ? [1, -1] : [-1, 1];
+        // Truly randomize horizontal direction to prevent bias
+        const horizontalDirections = [
+            [-1, 0],  // left
+            [1, 0]    // right
+        ].sort(() => Math.random() - 0.5);
         
         for (let x = 0; x < cols; x++) {
             const particle = oldGrid[y][x];
             
             // Skip empty or immovable particles
             if (particle.type === 'empty' || !particleProperties[particle.type].movable) continue;
+
+            // Performance tracking
+            particleUpdatesLastFrame++;
 
             // Gravity-based particles (sand, water, etc.)
             if (particleProperties[particle.type].gravity) {
@@ -97,10 +119,10 @@ function updatePhysics() {
                 if (particleProperties[particle.type].liquid) {
                     // Try to spread out horizontally to level the surface
                     const levelingDirections = [
-                        [horizontalDirections[0], 0],  // primary horizontal direction
-                        [horizontalDirections[1], 0],  // opposite horizontal direction
-                        [horizontalDirections[0], 1],  // diagonal down
-                        [horizontalDirections[1], 1]   // opposite diagonal down
+                        [horizontalDirections[0][0], 0],  // first horizontal direction
+                        [horizontalDirections[1][0], 0],  // second horizontal direction
+                        [horizontalDirections[0][0], 1],  // diagonal down first direction
+                        [horizontalDirections[1][0], 1]   // diagonal down second direction
                     ];
                     
                     for (const [dx, dy] of levelingDirections) {
@@ -119,8 +141,8 @@ function updatePhysics() {
                 // Sand-like behavior for non-liquid gravity particles
                 else {
                     const sandDirections = [
-                        [horizontalDirections[0], 1],  // primary diagonal down
-                        [horizontalDirections[1], 1]   // opposite diagonal down
+                        [horizontalDirections[0][0], 1],  // first diagonal down
+                        [horizontalDirections[1][0], 1]   // second diagonal down
                     ];
                     
                     for (const [dx, dy] of sandDirections) {
@@ -140,15 +162,14 @@ function updatePhysics() {
             
             // Gas behavior
             if (particleProperties[particle.type].gas) {
-                // Try to spread out and move upwards
+                // Gas physics: opposite of liquid, but with spreading
                 const gasDirections = [
                     [0, -1],    // directly up
-                    [-1, -1],   // up-left
-                    [1, -1],    // up-right
-                    [-1, 0],    // left
-                    [1, 0],     // right
-                    [-1, -2],   // further up-left
-                    [1, -2]     // further up-right
+                    [horizontalDirections[0][0], -1],  // up in first horizontal direction
+                    [horizontalDirections[1][0], -1],  // up in second horizontal direction
+                    [horizontalDirections[0][0], 0],   // first horizontal
+                    [horizontalDirections[1][0], 0],   // second horizontal
+                    [0, -2]     // further up
                 ];
                 
                 for (const [dx, dy] of gasDirections) {
@@ -159,18 +180,8 @@ function updatePhysics() {
                         newY >= 0 && newY < rows && 
                         grid[newY][newX].type === 'empty') {
                         
-                        // Check surrounding cells to simulate leveling
-                        const surroundingEmptySpaces = [
-                            [newX-1, newY],
-                            [newX+1, newY]
-                        ].filter(([sx, sy]) => 
-                            sx >= 0 && sx < cols && 
-                            sy >= 0 && sy < rows && 
-                            grid[sy][sx].type === 'empty'
-                        );
-                        
-                        // Move if there are empty spaces around to spread out
-                        if (surroundingEmptySpaces.length > 0) {
+                        // Prefer upward and spreading movements
+                        if (dy <= 0) {
                             grid[newY][newX] = particle;
                             grid[y][x] = { type: 'empty', color: particleProperties.empty.color };
                             break;
@@ -180,6 +191,9 @@ function updatePhysics() {
             }
         }
     }
+
+    // Return performance data
+    return particleUpdatesLastFrame;
 }
 
 function createExplosion(x, y) {

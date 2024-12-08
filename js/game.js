@@ -30,6 +30,30 @@ class SandboxGame {
         this.physicsWorker = new Worker('/js/physics-worker.js');
         this.physicsWorker.onmessage = this.handleWorkerMessage.bind(this);
         
+        // Statistics tracking
+        this.registeredParticles = Object.keys(PARTICLE_PROPERTIES)
+            .filter(type => type !== 'empty')
+            .map(type => ({ 
+                type, 
+                count: 0,
+                color: PARTICLE_PROPERTIES[type].color 
+            }));
+        
+        this.statistics = {
+            particlesCount: 0,
+            registeredParticlesCount: this.registeredParticles.length,
+            particlesOnscreen: 0,
+            particleTypesOnscreen: 0,
+            particleUpdatesLastFrame: 0,
+            mspt: 0 // Milliseconds per tick
+        };
+
+        // Performance tracking
+        this.performanceTracker = {
+            lastUpdateTime: performance.now(),
+            updateCount: 0
+        };
+        
         this.setupCanvas();
         this.setupGrid();
         this.setupEventListeners();
@@ -37,13 +61,16 @@ class SandboxGame {
     }
 
     handleWorkerMessage(e) {
-        const { type, grid, currentTPS } = e.data;
+        const { type, grid, currentTPS, particleUpdatesLastFrame } = e.data;
         switch(type) {
             case 'gridUpdate':
                 this.grid = grid;
                 break;
             case 'tpsUpdate':
                 document.getElementById('current-tps').textContent = currentTPS;
+                break;
+            case 'performanceUpdate':
+                this.statistics.particleUpdatesLastFrame = particleUpdatesLastFrame;
                 break;
         }
     }
@@ -260,8 +287,47 @@ class SandboxGame {
         });
     }
 
+    updateStatistics() {
+        // Reset per-frame statistics
+        this.statistics.particlesCount = 0;
+        this.statistics.particleTypesOnscreen = new Set();
+        
+        // Reset registered particles counts
+        this.registeredParticles.forEach(particle => particle.count = 0);
+
+        // Count particles in the grid
+        for (let y = 0; y < this.rows; y++) {
+            for (let x = 0; x < this.cols; x++) {
+                const particle = this.grid[y][x];
+                if (particle.type !== 'empty') {
+                    this.statistics.particlesCount++;
+                    this.statistics.particleTypesOnscreen.add(particle.type);
+
+                    // Update registered particles count
+                    const registeredParticle = this.registeredParticles
+                        .find(p => p.type === particle.type);
+                    if (registeredParticle) {
+                        registeredParticle.count++;
+                    }
+                }
+            }
+        }
+
+        // Convert set to number for display
+        this.statistics.particleTypesOnscreen = this.statistics.particleTypesOnscreen.size;
+
+        // Update DOM elements
+        document.getElementById('particles-count').textContent = this.statistics.particlesCount;
+        document.getElementById('registered-particles').textContent = this.statistics.registeredParticlesCount;
+        document.getElementById('particle-types-onscreen').textContent = this.statistics.particleTypesOnscreen;
+        document.getElementById('particle-updates-last-frame').textContent = this.statistics.particleUpdatesLastFrame;
+        document.getElementById('MSPT').textContent = this.statistics.mspt.toFixed(2);
+    }
+
     startGameLoop() {
         const gameLoop = () => {
+            const startTime = performance.now();
+
             // FPS counting
             this.frameCount++;
             const now = performance.now();
@@ -272,8 +338,22 @@ class SandboxGame {
                 this.lastFPSUpdate = now;
             }
 
+            // Performance tracking for physics updates
+            const updateStart = performance.now();
+            this.physicsWorker.postMessage({
+                type: 'updateRequest'
+            });
+
             // Render as fast as possible
             this.render();
+            
+            // Update statistics
+            this.updateStatistics();
+
+            // Calculate MSPT (Milliseconds per tick)
+            const updateEnd = performance.now();
+            this.statistics.mspt = updateEnd - updateStart;
+
             requestAnimationFrame(gameLoop);
         };
 
